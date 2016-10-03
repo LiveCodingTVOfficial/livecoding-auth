@@ -1,6 +1,7 @@
 <?php
 /*\
 |*| This file is part of the LivecodingAuth wrapper library for the livecoding.tv API
+|*| Copyright 2015-2016 William Bartolini <https://github.com/Wapaca/livecoding-auth/issues>
 |*| Copyright 2015-2016 bill-auger <https://github.com/Wapaca/livecoding-auth/issues>
 |*|
 |*| LivecodingAuth is free software: you can redistribute it and/or modify
@@ -17,20 +18,30 @@
 |*| along with LivecodingAuth.  If not, see <http://www.gnu.org/licenses/>.
 \*/
 
-/*\
-|*| This file contains the LivecodingAuth library classes.
-|*| Normally, this file need not be modified except to implement a custom model sublass..
-|*| This script assumes that you have already created an app on the LCTV API website
-|*|   and that you have selected the "confidential/authorization-grant" app type.
-|*| Setup instructions exists in the README.md file in this repo
-|*|   and a usage example exists in the example.php file in this repo.
-\*/
+
+/**
+* Livecoding.tv API
+*
+* This file contains the LivecodingAuth library classes.
+* Normally, this file need not be modified except to implement a custom model sublass.
+* This script assumes that you have already created an app on the LCTV API website
+*   and that you have selected the "confidential/authorization-grant" app type.
+* Setup instructions exists in the README.md file in this repo
+*   and a usage example exists in the example.php file in this repo.
+*
+* @package LivecodingAuth\LivecodingAuth
+* @author Wapaca     - <https://github.com/Wapaca/livecoding-auth/issues>
+* @author bill-auger - <https://github.com/Wapaca/livecoding-auth/issues>
+* @license AGPLv3
+* @version 0.0.1
+**/
 
 
 define('CURL_NOT_FOUND_MSG', 'This library requires that curl be available on this server.');
 define('INVALID_CLIENT_ID_MSG', 'You must specify a client ID.');
 define('INVALID_CLIENT_SECRET_MSG', 'You must specify a client secret.');
 define('INVALID_REDIRECT_URL_MSG', 'You must specify a redirect URL.');
+define('INVALID_STORAGE_FLAG_MSG', 'Unknown storage flag: ');
 define('LCTV_TOKEN_URL', 'https://www.livecoding.tv/o/token/');
 define('LCTV_API_URL', 'https://www.livecoding.tv:443/api/');
 define("READ_SCOPE", 'read');                // Read basic public profile information
@@ -42,33 +53,99 @@ define("SESSION_STORE", 'session');
 define("TEXT_STORE", 'flat-file');
 
 
-if(!class_exists('LivecodingAuth')) {
+if (!class_exists('LivecodingAuth')) {
 
   /**
-    * @class LivecodingAuth - Negotiates and manages livecoding.tv API tokens and data requests
-    */
+   * @since 0.0.1
+   * @class LivecodingAuth - Negotiates and manages livecoding.tv API tokens and data requests
+   **/
   class LivecodingAuth {
 
+    /**
+    * Client id as defined on the LCTV API website
+    * @since 0.0.1
+    * @access private
+    * @var string
+    **/
     private $client_id;
+    /**
+    * Client secret as defined on the LCTV API website
+    * @since 0.0.1
+    * @access private
+    * @var string
+    **/
     private $client_secret;
+    /**
+    * Redirect URL as defined on the LCTV API website
+    * @since 0.0.1
+    * @access private
+    * @var string
+    **/
     private $redirect_url;
+    /**
+    * API access scope
+    * @since 0.0.1
+    * @access private
+    * @var string
+    **/
     private $scope;
+    /**
+    * API token request state
+    * @since 0.0.1
+    * @access private
+    * @var string
+    **/
     private $state;
+    /**
+    * API authorization state
+    * @since 0.0.1
+    * @access private
+    * @var string
+    **/
     private $is_authorized;
+    /**
+    * API user authorization link
+    * @since 0.0.1
+    * @access private
+    * @var string
+    **/
     private $auth_link;
+    /**
+    * Standard token request headers
+    * @since 0.0.1
+    * @access private
+    * @var string
+    **/
     private $token_req_headers;
+    /**
+    * Standard token request params
+    * @since 0.0.1
+    * @access private
+    * @var string
+    **/
     private $token_req_params;
+    /**
+    * Standard API request params
+    * @since 0.0.1
+    * @access private
+    * @var string
+    **/
     private $api_req_params;
 
     /**
-     * Negotiates and manages livecoding.tv API tokens and data requests
-     * @param string $client_id     - As defined in your LCTV API app configuration
-     * @param string $client_secret - As defined in your LCTV API app configuration
-     * @param string $redirect_url  - As defined in your LCTV API app configuration
-     * @param string $scope         - One of the *_SCOPE constants (default: 'read')
-     * @param string $storage       - One of the *_STORE constants (default: 'session')
-     * @throws Exception            - If curl not accessible or if missing credentials
-     */
+    * Negotiates and manages livecoding.tv API tokens and data requests
+    * @since 0.0.1
+    * @api
+    * @access public
+    * @param string $client_id     - As defined in your LCTV API app configuration
+    * @param string $client_secret - As defined in your LCTV API app configuration
+    * @param string $redirect_url  - As defined in your LCTV API app configuration
+    * @param string $scope         - One of the *_SCOPE constants (default: 'read')
+    * @param string $storage       - One of the *_STORE constants (default: 'session')
+    * @throws Exception            - If curl not accessible
+    * @throws Exception            - If missing credentials
+    * @throws Exception            - If unknown storage flag given
+    **/
     function __construct($client_id, $client_secret, $redirect_url,
                          $scope = READ_SCOPE, $storage = SESSION_STORE) {
       // Assert curl accessibilty and validate params
@@ -84,13 +161,15 @@ if(!class_exists('LivecodingAuth')) {
       $this->scope = $scope;
       $this->state = uniqid();
 
-      if ($storage == TEXT_STORE) {
-        $this->tokens = new LivecodingAuthTokensText();
-      } else { // ($storage == SESSION_STORE) 
+      if ($storage == SESSION_STORE) {
         $this->tokens = new LivecodingAuthTokensSession();
+      } else if ($storage == TEXT_STORE) {
+        $this->tokens = new LivecodingAuthTokensText();
+      } else {
+        throw new Exception(INVALID_STORAGE_FLAG_MSG . $storage , 1);
       }
 
-      $this->auth_link = 'https://www.livecoding.tv/o/authorize/?'.http_build_query(array(
+      $this->auth_link = 'https://www.livecoding.tv/o/authorize/?' . http_build_query(array(
         'scope' => $this->scope,
         'state' => $this->state,
         'redirect_uri' => $this->redirect_url,
@@ -101,7 +180,7 @@ if(!class_exists('LivecodingAuth')) {
       $this->token_req_headers = [
         "Cache-Control: no-cache",
         "Pragma: no-cache",
-        'Authorization: Basic '.base64_encode($this->client_id.':'.$this->client_secret),
+        'Authorization: Basic ' . base64_encode($this->client_id . ':' . $this->client_secret),
       ];
       $this->token_req_params = [
         'grant_type' => '',
@@ -134,10 +213,13 @@ if(!class_exists('LivecodingAuth')) {
     } // __construct
 
     /**
-     * Request some data from the API
-     * @param string $data_path - The data to get e.g. 'livestreams/channelname/'
-     * @return string           - The requested data as JSON string or error message
-     */
+    * Request some data from the API
+    * @since 0.0.1
+    * @api
+    * @access public
+    * @param string $data_path - The data to get e.g. 'livestreams/channelname/'
+    * @return string           - The requested data as JSON string or error message
+    **/
     public function fetchData($data_path) {
       // Refresh tokens from API server if necessary
       if ($this->tokens->is_stale()) {
@@ -152,25 +234,36 @@ if(!class_exists('LivecodingAuth')) {
     } // fetchData
 
     /**
-     * Check if auth tokens exist and we are prepared to make API requests
-     * @return boolean - Returns TRUE if the app is ready to make requests,
-     *                       or FALSE if user authorization is required
-     */
+    * Check if auth tokens exist and we are prepared to make API requests
+    * @since 0.0.1
+    * @api
+    * @access public
+    * @return boolean - Returns TRUE if the app is ready to make requests,
+    *                       or FALSE if user authorization is required
+    **/
     public function getIsAuthorized() {
       return $this->tokens->isAuthorized();
     }
 
     /**
-     * Get link URL for manual user authorization
-     * @return string - The URL for manual user authorization
-     */
+    * Get link URL for manual user authorization
+    * @since 0.0.1
+    * @api
+    * @access public
+    * @return string - The URL for manual user authorization
+    **/
     public function getAuthLink() {
       return $this->auth_link;
     } // getAuthLink
 
     /**
-     * Wrapper to make a get request
-     */
+    * Wrapper to make a get request
+    * @since 0.0.1
+    * @access private
+    * @param string $url           - API endpoint request URL
+    * @param string $custom_header - (optional) HTTP header
+    * @return string               - JSON encoded API response
+    **/
     private function get_url_contents($url, $custom_header = []) {
         $crl = curl_init();
         $timeout = 5;
@@ -185,8 +278,14 @@ if(!class_exists('LivecodingAuth')) {
     } // get_url_contents
 
     /**
-     * Wrapper to make a post request
-     */
+    * Wrapper to make a post request
+    * @since 0.0.1
+    * @access private
+    * @param string $url           - tokens request URL
+    * @param string $fields        - POST fields
+    * @param string $custom_header - (optional) HTTP header
+    * @return string               - JSON encoded API tokens response
+    **/
     private function post_url_contents($url, $fields, $custom_header = []) {
 
         $fields_string = http_build_query($fields);
@@ -209,9 +308,11 @@ if(!class_exists('LivecodingAuth')) {
     } // post_url_contents
 
     /**
-     * Fetch initial tokens after manual user auth
-     * @param string $code - Auth code returned by the API in redirect URL params
-     */
+    * Fetch initial tokens after manual user auth
+    * @since 0.0.1
+    * @access private
+    * @param string $code - Auth code returned by the API in redirect URL params
+    **/
     private function fetchTokens($code) {
       $this->tokens->setCode($code);
       $this->token_req_params['code'] = $code;
@@ -223,11 +324,11 @@ if(!class_exists('LivecodingAuth')) {
       $this->tokens->storeTokens($res);
     } // fetchTokens
 
-// TODO: check this - it may be that supplying 'code' with every 'refresh_token' request
-//          may avoid having to manually authorize the app repeatedly (issue #4)
     /**
-     * Refresh stale tokens
-     */
+    * Refresh stale tokens
+    * @since 0.0.1
+    * @access private
+    **/
     private function refreshToken() {
       $this->token_req_params['grant_type'] = 'refresh_token';
       $this->token_req_params['refresh_token'] = $this->tokens->getRefreshToken();
@@ -239,14 +340,16 @@ if(!class_exists('LivecodingAuth')) {
     } // refreshToken
 
     /**
-     * Request API data
-     * @param string $data_path - The data to get e.g. 'livestreams/channelname/'
-     * @return string           - The requested data as JSON string or error message
-     */
+    * Request API data
+    * @since 0.0.1
+    * @access private
+    * @param string $data_path - The data to get e.g. 'livestreams/channelname/'
+    * @return string           - The requested data as JSON string or error message
+    **/
     private function sendGetRequest($data_path) {
       $this->api_req_params[2] = $this->tokens->makeAuthParam();
 
-      $res = $this->get_url_contents(LCTV_API_URL.$data_path, $this->api_req_params);
+      $res = $this->get_url_contents(LCTV_API_URL . $data_path, $this->api_req_params);
 
       $res = json_decode($res);
 
@@ -257,20 +360,33 @@ if(!class_exists('LivecodingAuth')) {
     } // sendGetRequest
 
   } // class LivecodingAuth
+
 } // if(!class_exists)
 
 
-if(!class_exists('LivecodingAuthTokens')) {
+if (!class_exists('LivecodingAuthTokens')) {
 
   /**
-  * @class LivecodingAuthTokens
+  *
+  * LivecodingAuthTokens
+  *
   * LivecodingAuthTokens is intended to be semi-abstract
   * Only its subclasses should be instantiated
+  * @since 0.0.1
+  * @internal
+  * @access public
+  * @class LivecodingAuthTokens
+  * @see LivecodingAuthTokensSession
+  * @see LivecodingAuthTokensText
   **/
   abstract class LivecodingAuthTokens {
 
     /**
     * Store token data to subclass defined backend
+    * @since 0.0.1
+    * @internal
+    * @access public
+    * @param string $tokens - JSON encoded API response containing granted tokens
     **/
     public function storeTokens($tokens) {
       $tokens = json_decode($tokens);
@@ -286,6 +402,11 @@ if(!class_exists('LivecodingAuthTokens')) {
 
     /**
     * Determine if our access token needs to be refreshed
+    * @since 0.0.1
+    * @internal
+    * @access public
+    * @return boolean - Returns TRUE if the access token has expired,
+    *                       or FALSE if the access token is still valid
     **/
     public function is_stale() {
       return (strtotime($this->getExpiresIn()) - time()) < 7200;
@@ -293,55 +414,182 @@ if(!class_exists('LivecodingAuthTokens')) {
 
     /**
     * Concatenate current auth token to param string for data request
+    * @since 0.0.1
+    * @internal
+    * @access public
+    * @return string - The properly formatted authorization parameter
     **/
     public function makeAuthParam() {
-      return 'Authorization: '.$this->getTokenType().' '.$this->getAccessToken();
+      return 'Authorization: '.$this->getTokenType() . ' ' . $this->getAccessToken();
     }
 
 
     // Subclasses should override these getters and setters
 
+    /**
+    * Check if auth tokens exist and we are prepared to make API requests
+    *     * Subclass Responsibility *
+    * @since 0.0.1
+    * @internal
+    * @access public
+    * @return boolean - Returns TRUE if the app is ready to make requests,
+    *                       or FALSE if user authorization is required
+    **/
     abstract public function isAuthorized();
 
+    /**
+    * Set API token authorization code
+    *     * Subclass Responsibility *
+    * @since 0.0.1
+    * @internal
+    * @access public
+    * @param string $code - API token authorization code
+    **/
+    abstract public function setCode($code);
+    /**
+    * Get API token authorization code
+    *     * Subclass Responsibility *
+    * @since 0.0.1
+    * @internal
+    * @access public
+    * @return string - API token authorization code
+    **/
     abstract public function getCode();
 
-    abstract public function setCode($code);
-
+    /**
+    * Set API token request state
+    *     * Subclass Responsibility *
+    * @since 0.0.1
+    * @internal
+    * @access public
+    * @param string $code - API token request state
+    **/
+    abstract public function setState($state);
+    /**
+    * Get API token request state
+    *     * Subclass Responsibility *
+    * @since 0.0.1
+    * @internal
+    * @access public
+    * @return string - API token request state
+    **/
     abstract public function getState();
 
-    abstract public function setState($state);
-
+    /**
+    * Set API access token
+    *     * Subclass Responsibility *
+    * @since 0.0.1
+    * @internal
+    * @access public
+    * @param string $code - API access token
+    **/
+    abstract public function setAccessToken($access_token);
+    /**
+    * Get API access token
+    *     * Subclass Responsibility *
+    * @since 0.0.1
+    * @internal
+    * @access public
+    * @return string - API access token
+    **/
     abstract public function getAccessToken();
 
-    abstract public function setAccessToken($access_token);
-
+    /**
+    * Set API token type
+    *     * Subclass Responsibility *
+    * @since 0.0.1
+    * @internal
+    * @access public
+    * @param string $code - API token type
+    **/
+    abstract public function setTokenType($token_type);
+    /**
+    * Get API token type
+    *     * Subclass Responsibility *
+    * @since 0.0.1
+    * @internal
+    * @access public
+    * @return string - API token type
+    **/
     abstract public function getTokenType();
 
-    abstract public function setTokenType($token_type);
-
+    /**
+    * Set API refresh token
+    *     * Subclass Responsibility *
+    * @since 0.0.1
+    * @internal
+    * @access public
+    * @param string $code - API refresh token
+    **/
+    abstract public function setRefreshToken($refresh_token);
+    /**
+    * Get API refresh token
+    *     * Subclass Responsibility *
+    * @since 0.0.1
+    * @internal
+    * @access public
+    * @return string - API refresh token
+    **/
     abstract public function getRefreshToken();
 
-    abstract public function setRefreshToken($refresh_token);
-
+    /**
+    * Set API access token expitartion date
+    *     * Subclass Responsibility *
+    * @since 0.0.1
+    * @internal
+    * @access public
+    * @param string $code - API access token expitartion date (formatted by date())
+    **/
+    abstract public function setExpiresIn($expires_in);
+    /**
+    * Get API access token expitartion date
+    *     * Subclass Responsibility *
+    * @since 0.0.1
+    * @internal
+    * @access public
+    * @return string - access token expitartion date (formatted for strtotime())
+    **/
     abstract public function getExpiresIn();
 
-    abstract public function setExpiresIn($expires_in);
-
+    /**
+    * Set API access scope
+    *     * Subclass Responsibility *
+    * @since 0.0.1
+    * @internal
+    * @access public
+    * @param string $code - API access scope
+    **/
+    abstract public function setScope($scope);
+    /**
+    * Get API access scope
+    *     * Subclass Responsibility *
+    * @since 0.0.1
+    * @internal
+    * @access public
+    * @return string - API access scope
+    **/
     abstract public function getScope();
 
-    abstract public function setScope($scope);
   }
 
 } // if(!class_exists('LivecodingAuthTokens'))
 
 
-if(!class_exists('LivecodingAuthTokensSession')) {
+if (!class_exists('LivecodingAuthTokensSession')) {
 
   /**
+  *
+  * LivecodingAuthTokensSession
+  *
+  * A LivecodingAuthTokens reference subclass using session storage
+  * @since 0.0.1
+  * @internal
+  * @access public
   * @class LivecodingAuthTokensSession
-  * A LivecodingAuthTokens subclass using session storage
+  * @see LivecodingAuthTokens
   **/
   class LivecodingAuthTokensSession extends LivecodingAuthTokens {
+
     function __construct() {
       if (!isset($_SESSION)) {
         session_start();
@@ -407,18 +655,27 @@ if(!class_exists('LivecodingAuthTokensSession')) {
     public function setExpiresIn($expires_in) {
       $_SESSION['expires_in'] = $expires_in;
     } // setExpiresIn
+
   } // class LivecodingAuthTokens
 
 } // if(!class_exists('LivecodingAuthTokensSession'))
 
 
-if(!class_exists('LivecodingAuthTokensText')) {
+if (!class_exists('LivecodingAuthTokensText')) {
 
   /**
+  *
+  * LivecodingAuthTokensText
+  *
+  * A LivecodingAuthTokens reference subclass using session storage
+  * @since 0.0.1
+  * @internal
+  * @access public
   * @class LivecodingAuthTokensText
-  * A LivecodingAuthTokens subclass using session storage
+  * @see LivecodingAuthTokens
   **/
   class LivecodingAuthTokensText extends LivecodingAuthTokens {
+
     public function isAuthorized() {
       return file_exists('code') ;
     } // isAuthorized
@@ -478,6 +735,7 @@ if(!class_exists('LivecodingAuthTokensText')) {
     public function setExpiresIn($expires_in) {
       file_put_contents('expires_in', $expires_in);
     } // setExpiresIn
+
   } // class LivecodingAuthTokensText
 
 } // if(!class_exists('LivecodingAuthTokensText'))
